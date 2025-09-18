@@ -1,42 +1,117 @@
-package assignment;
-import java.io.*;
-import java.util.*;
 
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project aggregates tasks and resources, and provides analysis methods.
+ */
 public class Project {
-    public static void main(String[] args) {
-        System.out.println("Question 1");
-        List<Task<Integer>> tasks = new ArrayList<>();
+    private List<Task> tasks = new ArrayList<>();
+    private List<Resource> resources = new ArrayList<>();
 
-        try (Scanner scanner = new Scanner(new File("data.txt"))) {
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine().trim();
-                if (line.isEmpty()) continue;
+    public Project() {}
 
-                String[] data = line.split(",");
+    public void addTask(Task t) { tasks.add(t); }
+    public void addResource(Resource r) { resources.add(r); }
 
-                int id = Integer.parseInt(data[0].trim());
-                String title = data[1].trim();
-                String startTime = data[2].trim();   // still a string
-                String endTime = data[3].trim();     // still a string
+    public List<Task> getTasks() { return tasks; }
+    public List<Resource> getResources() { return resources; }
 
-                List<Integer> dependencies = new ArrayList<>();
-                for (int i = 4; i < data.length; i++) {
-                    String dep = data[i].trim();
-                    if (!dep.isEmpty()) {
-                        dependencies.add(Integer.parseInt(dep));
-                    }
-                }
+    // i) Project completion time & duration (hours)
+    public void printCompletionAndDuration() {
+        LocalDateTime earliest = null;
+        LocalDateTime latest = null;
 
-                // ✅ Task constructor now handles conversion to LocalDateTime
-                Task<Integer> task = new Task<>(id, title, startTime, endTime, dependencies);
-                tasks.add(task);
+        for (Task t : tasks) {
+            LocalDateTime s = t.getStart();
+            LocalDateTime e = t.getEnd();
+            if (s != null) {
+                if (earliest == null || s.isBefore(earliest)) earliest = s;
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (e != null) {
+                if (latest == null || e.isAfter(latest)) latest = e;
+            }
         }
 
-        for (Task<Integer> task : tasks) {
-            System.out.println(task);
+        if (earliest == null || latest == null) {
+            System.out.println("Not enough datetime information to compute project duration.");
+            return;
         }
+
+        long hours = java.time.Duration.between(earliest, latest).toHours();
+
+        System.out.println("Project starts: " + earliest);
+        System.out.println("Project ends:   " + latest);
+        System.out.println("Project duration: " + hours + " hours (" + (hours/24) + " days approx.)");
+    }
+
+    // ii) Highlight overlapping tasks (task starts before its dependency ends and they have common timeframe)
+    public void printOverlappingTasks() {
+        System.out.println("\nOverlapping tasks (task starts before dependency ended):");
+        // Build a map-style lookup: but keep simple loops
+        for (Task t : tasks) {
+            List<Integer> deps = t.getDependencies();
+            if (deps == null || deps.isEmpty()) continue;
+
+            LocalDateTime tStart = t.getStart();
+            LocalDateTime tEnd = t.getEnd();
+            if (tStart == null || tEnd == null) continue;
+
+            for (Integer depId : deps) {
+                Task dep = findTaskById(depId);
+                if (dep == null) continue;
+                LocalDateTime depStart = dep.getStart();
+                LocalDateTime depEnd = dep.getEnd();
+                if (depStart == null || depEnd == null) continue;
+
+                // overlap if their intervals intersect
+                boolean intersects = tStart.isBefore(depEnd) && depStart.isBefore(tEnd);
+
+                // specifically check "task starts before dependency finished" per requirement
+                boolean startsBeforeDepFinished = tStart.isBefore(depEnd);
+
+                if (intersects && startsBeforeDepFinished) {
+                    System.out.println(" - Task " + t.getId() + " (" + t.getTitle() + ") overlaps with dependency Task "
+                                       + dep.getId() + " (" + dep.getTitle() + ")");
+                }
+            }
+        }
+    }
+
+    // iii) Find resources (team) for a specific task
+    public void printTeamForTask(int taskId) {
+        System.out.println("\nTeam for Task " + taskId + ":");
+        boolean found = false;
+        for (Resource r : resources) {
+            for (Allocation a : r.getAllocations()) {
+                if (a.getTask().getId() == taskId) {
+                    System.out.println(" - " + r.getName() + " (" + a.getEffortPercent() + "%)");
+                    found = true;
+                }
+            }
+        }
+        if (!found) System.out.println(" No resources assigned.");
+    }
+
+    // iv) Total effort (hours) required by each resource on the project
+    public void printTotalEffortPerResource() {
+        System.out.println("\nTotal effort (hours) per resource:");
+        for (Resource r : resources) {
+            double total = 0.0;
+            for (Allocation a : r.getAllocations()) {
+                total += a.getEffortHours();
+            }
+            System.out.println(" - " + r.getName() + " => " + total + " hours");
+        }
+    }
+
+    // helper
+    private Task findTaskById(int id) {
+        for (Task t : tasks) {
+            if (t.getId() == id) return t;
+        }
+        return null;
     }
 }

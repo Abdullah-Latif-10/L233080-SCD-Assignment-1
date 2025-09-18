@@ -1,36 +1,30 @@
-package assignment;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+
+
+// ...existing code...
 import java.util.*;
 
-public class Task<T> {
-    int id;
-    String title;
-    LocalDateTime startTime;
-    LocalDateTime endTime;
-    List<T> dependencies;
+public abstract class Task {
+    protected int id;
+    protected String title;
+    protected List<Integer> dependencies;
 
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-    public Task(int id,
-                String title,
-                String startTime,
-                String endTime,
-                List<T> dependencies) {
+    public Task(int id, String title, List<Integer> dependencies) {
         this.id = id;
         this.title = title;
-        this.startTime = LocalDateTime.parse(startTime, FORMATTER);
-        this.endTime = LocalDateTime.parse(endTime, FORMATTER);
         this.dependencies = dependencies;
     }
+
+    public int getId() { return id; }
+    public String getTitle() { return title; }
+    public List<Integer> getDependencies() { return dependencies; }
+
+    public abstract java.time.LocalDateTime getStart();
+    public abstract java.time.LocalDateTime getEnd();
+    public abstract long getDurationHours();
 
     @Override
     public String toString() {
         return "Task " + id + ": " + title +
-                " [" + startTime + " - " + endTime + "] " +
-                "Depends on: " + (dependencies.isEmpty() ? "None" : dependencies);
+               " Depends on: " + (dependencies.isEmpty() ? "None" : dependencies);
     }
-    public long getDurationHours() {
-    return java.time.Duration.between(startTime, endTime).toHours();
-}
 }

@@ -1,148 +1,128 @@
-package assignment;
+
 
 import java.io.*;
 import java.time.LocalDateTime;
 import java.util.*;
 
 public class ProjectDuration {
+    public static List<Task> loadTasks(String fileName) throws IOException {
+        List<Task> tasks = new ArrayList<>();
+        try (Scanner sc = new Scanner(new File(fileName))) {
+            while (sc.hasNextLine()) {
+                String line = sc.nextLine().trim();
+                if (line.isEmpty()) continue;
 
-    // Load tasks from file
-    public static List<Task<Integer>> loadTasks(String fileName) throws IOException {
-        List<Task<Integer>> tasks = new ArrayList<>();
-        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                // Example: 1, Research, 2025-09-01 10:00, 2025-09-02 12:00, 2 3
                 String[] parts = line.split(",");
                 int id = Integer.parseInt(parts[0].trim());
                 String title = parts[1].trim();
                 String start = parts[2].trim();
                 String end = parts[3].trim();
 
-                List<Integer> dependencies = new ArrayList<>();
-                if (parts.length > 4) {
-                    String[] deps = parts[4].trim().split(" ");
-                    for (String d : deps) {
-                        if (!d.isEmpty()) {
-                            dependencies.add(Integer.parseInt(d.trim()));
-                        }
-                    }
+                List<Integer> deps = new ArrayList<>();
+                for (int i = 4; i < parts.length; i++) {
+                    if (!parts[i].trim().isEmpty())
+                        deps.add(Integer.parseInt(parts[i].trim()));
                 }
-                
-tasks.add(new Task<Integer>(id, title, start, end, dependencies));
+                tasks.add(new AtomicTask(id, title, start, end, deps));
             }
         }
         return tasks;
     }
 
-    // Load resources from file
-    public static List<Resources> loadResources(String fileName) throws IOException {
-        List<Resources> resources = new ArrayList<>();
+    public static List<Resource> loadResources(String fileName) throws IOException {
+        List<Resource> resources = new ArrayList<>();
+        try (Scanner sc = new Scanner(new File(fileName))) {
+            while (sc.hasNextLine()) {
+                String line = sc.nextLine().trim();
+                if (line.isEmpty()) continue;
 
-        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                // Example: Ahmed, 1:50, 3:100, 4:100, 5:50
                 String[] parts = line.split(",");
-                String name = parts[0].trim();
-                Resources res = new Resources(name);
+                Resource r = new Resource(parts[0].trim());
 
                 for (int i = 1; i < parts.length; i++) {
-                    String[] taskEffort = parts[i].trim().split(":");
-                    int taskId = Integer.parseInt(taskEffort[0].trim());
-                    int effort = Integer.parseInt(taskEffort[1].trim());
-                    res.addTaskEffort(taskId, effort);
+                    String[] pair = parts[i].trim().split(":");
+                    if (pair.length == 2)
+                        r.addTaskEffort(Integer.parseInt(pair[0].trim()), Integer.parseInt(pair[1].trim()));
                 }
-                resources.add(res);
+                resources.add(r);
             }
         }
         return resources;
     }
 
-    // Find project completion time & duration
-    public static void findCompletionTime(List<Task<Integer>> tasks) {
-        LocalDateTime earliest = tasks.stream()
-                .map(t -> t.startTime)
-                .min(LocalDateTime::compareTo)
-                .orElse(null);
-
-        LocalDateTime latest = tasks.stream()
-                .map(t -> t.endTime)
-                .max(LocalDateTime::compareTo)
-                .orElse(null);
+    // i) Project completion time
+    public static void findCompletionTime(List<Task> tasks) {
+        LocalDateTime earliest = tasks.stream().map(Task::getStart).min(LocalDateTime::compareTo).orElse(null);
+        LocalDateTime latest = tasks.stream().map(Task::getEnd).max(LocalDateTime::compareTo).orElse(null);
 
         if (earliest != null && latest != null) {
             System.out.println("Project Completion Time: " + latest);
             System.out.println("Project Duration: " +
-                    java.time.Duration.between(earliest, latest).toHours() + " hours");
+                    java.time.Duration.between(earliest, latest).toDays() + " days");
         }
     }
 
-    // Highlight overlapping tasks
-    public static void findOverlappingTasks(List<Task<Integer>> tasks) {
-        System.out.println("\nOverlapping Tasks:");
-        for (int i = 0; i < tasks.size(); i++) {
-            for (int j = i + 1; j < tasks.size(); j++) {
-                Task<Integer> t1 = tasks.get(i);
-                Task<Integer> t2 = tasks.get(j);
-
-                boolean overlap = t1.startTime.isBefore(t2.endTime) &&
-                                  t2.startTime.isBefore(t1.endTime);
-
-                if (overlap) {
-                    System.out.println("Task " + t1.id + " (" + t1.title + ") overlaps with Task " +
-                                       t2.id + " (" + t2.title + ")");
+    // ii) Overlapping tasks
+    public static void findOverlappingTasks(List<Task> tasks) {
+        System.out.println("Overlapping Tasks:");
+        for (Task t : tasks) {
+            for (Integer depId : t.getDependencies()) {
+                Task dep = tasks.stream().filter(d -> d.getId() == depId).findFirst().orElse(null);
+                if (dep != null && t.getStart().isBefore(dep.getEnd())) {
+                    System.out.println("Task " + t.getId() + " overlaps with dependency " + dep.getId());
                 }
             }
         }
     }
 
-    // Find resources for a specific task
-    public static void findTeamForTask(List<Resources> resources, int taskId) {
-        System.out.print("\nTeam for Task " + taskId + ": ");
-        for (Resources r : resources) {
-            if (r.taskEfforts.containsKey(taskId)) {
-                System.out.print(r.name + " (" + r.taskEfforts.get(taskId) + "%)  ");
+    // iii) Team for a specific task
+    public static void findTeamForTask(int taskId, List<Resource> resources) {
+        System.out.println("Team for Task " + taskId + ":");
+        for (Resource r : resources) {
+            if (r.getTaskEfforts().containsKey(taskId)) {
+                System.out.println("  " + r.getName() + " (" + r.getTaskEfforts().get(taskId) + "%)");
             }
         }
-        System.out.println();
     }
 
-    // Find total effort (hours) per resource
-    public static void findTotalEffort(List<Resources> resources, List<Task<Integer>> tasks) {
-        System.out.println("\nTotal Effort Per Resource:");
-        for (Resources r : resources) {
+    // iv) Total effort per resource
+    public static void findTotalEffort(List<Resource> resources, List<Task> tasks) {
+        for (Resource r : resources) {
             long total = 0;
-            for (Map.Entry<Integer, Integer> entry : r.taskEfforts.entrySet()) {
-                int taskId = entry.getKey();
-                int percent = entry.getValue();
-
-                Task<Integer> task = tasks.stream()
-                        .filter(t -> t.id == taskId)
-                        .findFirst()
-                        .orElse(null);
-
+            for (Map.Entry<Integer, Integer> e : r.getTaskEfforts().entrySet()) {
+                int taskId = e.getKey();
+                int percent = e.getValue();
+                Task task = tasks.stream().filter(t -> t.getId() == taskId).findFirst().orElse(null);
                 if (task != null) {
-                    total += (task.getDurationHours() * percent) / 100;
+                    total += task.getDurationHours() * (percent / 100.0);
                 }
             }
-            System.out.println(r.name + " => " + total + " hours");
+            System.out.println(r.getName() + " => " + total + " hours");
         }
     }
 
-    // Main method for testing
-    public static void main(String[] args) {
-        try {
-            List<Task<Integer>> tasks = loadTasks("tasks.txt");
-            List<Resources> resources = loadResources("resources.txt");
+    public static void main(String[] args) throws Exception {
+        List<Task> tasks = loadTasks("data.txt");
+        List<Resource> resources = loadResources("2.txt");
 
-            findCompletionTime(tasks);
-            findOverlappingTasks(tasks);
-            findTeamForTask(resources, 1);
-            findTotalEffort(resources, tasks);
+        System.out.println("All tasks:");
+        tasks.forEach(System.out::println);
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        System.out.println("\nAll resources:");
+        for (Resource r : resources) {
+            System.out.println("  " + r);
         }
+
+        System.out.println("\nProject starts and ends:");
+        findCompletionTime(tasks);
+
+        System.out.println("\nOverlapping tasks (task starts before dependency ended):");
+        findOverlappingTasks(tasks);
+
+        System.out.println("\nTeam for Task 1:");
+        findTeamForTask(1, resources);
+
+        System.out.println("\nTotal effort (hours) per resource:");
+        findTotalEffort(resources, tasks);
     }
 }
