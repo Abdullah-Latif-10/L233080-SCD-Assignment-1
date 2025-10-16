@@ -1,5 +1,4 @@
-
-
+package assingment2;
 
 public class Allocation {
     private Resource resource;

@@ -1,3 +1,4 @@
+package assingment2;
 
 
 import java.io.*;
@@ -88,7 +89,7 @@ public class ProjectDuration {
     // iv) Total effort per resource
     public static void findTotalEffort(List<Resource> resources, List<Task> tasks) {
         for (Resource r : resources) {
-            long total = 0;
+            double total = 0.0;
             for (Map.Entry<Integer, Integer> e : r.getTaskEfforts().entrySet()) {
                 int taskId = e.getKey();
                 int percent = e.getValue();
